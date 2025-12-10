@@ -29,19 +29,42 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-app.get("/", (_req, res) => {
-  res.send("WhatsApp Tickets Bot is running ✔️");
-});
+// Root endpoint moved below - see health check section
 
 app.get("/health", (_req, res) => {
-  res.json({ 
-    status: "ok", 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
+  console.log("[HEALTH] Health check requested");
+  try {
+    res.status(200).json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      port: PORT,
+      pid: process.pid
+    });
+  } catch (error) {
+    console.error("[HEALTH] Error in health check:", error);
+    res.status(500).json({ 
+      status: "error",
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Root endpoint for Railway health checks
+app.get("/", (_req, res) => {
+  console.log("[ROOT] Root endpoint requested");
+  try {
+    res.status(200).send("WhatsApp Tickets Bot is running ✔️");
+  } catch (error) {
+    console.error("[ROOT] Error in root endpoint:", error);
+    res.status(500).send("Error");
+  }
 });
 
 app.post("/webhook/greenapi", webhook);
+
+// Declare server variable early so it can be used in signal handlers
+let server: ReturnType<typeof app.listen> | null = null;
 
 // Global error handler middleware (must be after routes)
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -71,24 +94,48 @@ process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) =>
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error: Error) => {
+  console.error("=".repeat(50));
   console.error("[ERROR] Uncaught Exception:", error);
   console.error("[ERROR] Stack:", error.stack);
-  // Log but don't exit - let Railway handle restarts
-  // Exiting here can cause Railway to think the app crashed
+  console.error("=".repeat(50));
+  // Log but don't exit immediately - let Railway see the error first
+  // Wait a bit before exiting to allow logs to be sent
+  setTimeout(() => {
+    console.error("[ERROR] Exiting due to uncaught exception");
+    process.exit(1);
+  }, 5000);
 });
 
 // Handle SIGTERM gracefully (Railway sends this when stopping)
 process.on('SIGTERM', () => {
   console.log("[SHUTDOWN] Received SIGTERM, shutting down gracefully...");
-  server.close(() => {
-    console.log("[SHUTDOWN] Server closed");
+  if (server) {
+    server.close(() => {
+      console.log("[SHUTDOWN] Server closed gracefully");
+      process.exit(0);
+    });
+    // Force exit after 10 seconds if graceful shutdown doesn't work
+    setTimeout(() => {
+      console.error("[SHUTDOWN] Forced exit after timeout");
+      process.exit(1);
+    }, 10000);
+  } else {
+    console.log("[SHUTDOWN] Server not initialized, exiting immediately");
     process.exit(0);
-  });
-  // Force exit after 10 seconds if graceful shutdown doesn't work
-  setTimeout(() => {
-    console.error("[SHUTDOWN] Forced exit after timeout");
-    process.exit(1);
-  }, 10000);
+  }
+});
+
+// Handle SIGINT (Ctrl+C) for local development
+process.on('SIGINT', () => {
+  console.log("[SHUTDOWN] Received SIGINT, shutting down gracefully...");
+  if (server) {
+    server.close(() => {
+      console.log("[SHUTDOWN] Server closed gracefully");
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
 });
 
 // Validate environment variables on startup
@@ -122,28 +169,53 @@ console.log("   - PORT:", PORT);
 
 console.log("[STARTUP] Attempting to start server on port", PORT);
 
-const server = app.listen(PORT, () => {
-  console.log("=".repeat(50));
-  console.log("✅ SERVER STARTED SUCCESSFULLY");
-  console.log("=".repeat(50));
-  console.log("✅ Server running on port", PORT);
-  console.log("📡 Webhook endpoint: http://localhost:" + PORT + "/webhook/greenapi");
-  console.log("🔒 Safe Mode - TEST_USER_PHONE:", process.env.TEST_USER_PHONE || "NOT SET");
-  console.log("📋 Health check: http://localhost:" + PORT + "/health");
-  console.log("=".repeat(50));
-});
+try {
+  server = app.listen(PORT, () => {
+    console.log("=".repeat(50));
+    console.log("✅ SERVER STARTED SUCCESSFULLY");
+    console.log("=".repeat(50));
+    console.log("✅ Server running on port", PORT);
+    console.log("📡 Webhook endpoint: http://localhost:" + PORT + "/webhook/greenapi");
+    console.log("🔒 Safe Mode - TEST_USER_PHONE:", process.env.TEST_USER_PHONE || "NOT SET");
+    console.log("📋 Health check: http://localhost:" + PORT + "/health");
+    console.log("📋 Root endpoint: http://localhost:" + PORT + "/");
+    console.log("=".repeat(50));
+    console.log("[SERVER] Server is ready and listening for connections");
+  });
 
-server.on('listening', () => {
-  console.log("[SERVER] Server is listening and ready to accept connections");
-});
+  server.on('listening', () => {
+    console.log("[SERVER] Server is listening and ready to accept connections");
+  });
 
-server.on('error', (error: Error) => {
+  server.on('error', (error: Error) => {
+    console.error("=".repeat(50));
+    console.error("❌ SERVER FAILED TO START");
+    console.error("=".repeat(50));
+    console.error("❌ Server error:", error);
+    console.error("❌ Stack:", error.stack);
+    console.error("=".repeat(50));
+    // Don't exit - let Railway handle it
+  });
+
+  // Keep the process alive
+  process.on('beforeExit', (code) => {
+    console.log(`[SHUTDOWN] Process about to exit with code: ${code}`);
+  });
+  
+  // Prevent the process from exiting - keep it alive
+  // The server itself keeps the process alive, but this is a safety measure
+  
+} catch (error) {
   console.error("=".repeat(50));
-  console.error("❌ SERVER FAILED TO START");
+  console.error("[STARTUP] Failed to start server:", error);
+  if (error instanceof Error) {
+    console.error("[STARTUP] Error stack:", error.stack);
+  }
   console.error("=".repeat(50));
-  console.error("❌ Server error:", error);
-  console.error("❌ Stack:", error.stack);
-  console.error("=".repeat(50));
-});
+  // Wait a bit before exiting to allow logs to be sent
+  setTimeout(() => {
+    process.exit(1);
+  }, 2000);
+}
 
 // This is already handled above, but keeping for clarity

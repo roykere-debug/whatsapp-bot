@@ -6,48 +6,57 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Initialize schema on module load
+// Initialize schema on module load - but don't block startup
 (async () => {
-  console.log("[DB] Initializing database connection...");
-  try {
-    console.log("[DB] Testing database connection...");
-    await pool.query('SELECT NOW()');
-    console.log("[DB] ✅ Database connection successful");
-    
-    console.log("[DB] Creating tables if they don't exist...");
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS user_states (
-        phone TEXT PRIMARY KEY,
-        state TEXT NOT NULL DEFAULT 'idle',
-        data JSONB DEFAULT '{}',
-        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-      );
+  // Wait a bit before trying to connect to let the server start first
+  setTimeout(async () => {
+    console.log("[DB] Initializing database connection...");
+    try {
+      if (!process.env.DATABASE_URL) {
+        console.error('[DB] ❌ DATABASE_URL not set, skipping database initialization');
+        return;
+      }
+      
+      console.log("[DB] Testing database connection...");
+      await pool.query('SELECT NOW()');
+      console.log("[DB] ✅ Database connection successful");
+      
+      console.log("[DB] Creating tables if they don't exist...");
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS user_states (
+          phone TEXT PRIMARY KEY,
+          state TEXT NOT NULL DEFAULT 'idle',
+          data JSONB DEFAULT '{}',
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
 
-      CREATE INDEX IF NOT EXISTS idx_user_states_updated_at ON user_states(updated_at);
+        CREATE INDEX IF NOT EXISTS idx_user_states_updated_at ON user_states(updated_at);
 
-      CREATE TABLE IF NOT EXISTS leads (
-        id SERIAL PRIMARY KEY,
-        phone TEXT NOT NULL,
-        game TEXT NOT NULL,
-        amount NUMERIC NOT NULL,
-        is_urgent BOOLEAN NOT NULL,
-        is_new_customer BOOLEAN NOT NULL,
-        raw JSONB,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW()
-      );
+        CREATE TABLE IF NOT EXISTS leads (
+          id SERIAL PRIMARY KEY,
+          phone TEXT NOT NULL,
+          game TEXT NOT NULL,
+          amount NUMERIC NOT NULL,
+          is_urgent BOOLEAN NOT NULL,
+          is_new_customer BOOLEAN NOT NULL,
+          raw JSONB,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
 
-      CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads(phone);
-      CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);
-    `);
-    console.log("[DB] ✅ Database schema initialized successfully");
-  } catch (error) {
-    console.error('[DB] ❌ Error initializing database schema:', error);
-    if (error instanceof Error) {
-      console.error('[DB] Error message:', error.message);
-      console.error('[DB] Error stack:', error.stack);
+        CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads(phone);
+        CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);
+      `);
+      console.log("[DB] ✅ Database schema initialized successfully");
+    } catch (error) {
+      console.error('[DB] ❌ Error initializing database schema:', error);
+      if (error instanceof Error) {
+        console.error('[DB] Error message:', error.message);
+        console.error('[DB] Error stack:', error.stack);
+      }
+      // Don't exit - let the server start and show the error
+      // The server can still run even if DB init fails
     }
-    // Don't exit - let the server start and show the error
-  }
+  }, 1000); // Wait 1 second before trying DB connection
 })();
 
 export async function getUserState(phone: string): Promise<UserState> {
