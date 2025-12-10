@@ -15,12 +15,16 @@ function getText(b: GreenWebhookBody): string {
 }
 
 export async function webhook(req: Request, res: Response) {
+  console.log("[WEBHOOK] Received request");
   const body = req.body as GreenWebhookBody;
 
   const chatId = body.senderData?.chatId || "";
   const sender = body.senderData?.sender || "";
 
+  console.log("[WEBHOOK] chatId:", chatId, "sender:", sender);
+
   const expectedChatId = `${TEST}@c.us`;
+  console.log("[WEBHOOK] Expected chatId:", expectedChatId, "TEST:", TEST);
 
   // SAFE MODE — ONLY YOU
   const isYou =
@@ -28,14 +32,22 @@ export async function webhook(req: Request, res: Response) {
     !chatId.includes("-") &&
     sender === TEST;
 
+  console.log("[WEBHOOK] isYou check:", isYou);
+
   if (!isYou) {
     console.log("[SAFE] ignored:", chatId, sender);
     return res.json({ ok: true, ignored: true });
   }
 
   const text = getText(body);
-  if (!text) return res.json({ ok: true });
+  console.log("[WEBHOOK] Text received:", text);
+  
+  if (!text) {
+    console.log("[WEBHOOK] No text, returning");
+    return res.json({ ok: true });
+  }
 
+  console.log("[WEBHOOK] Processing message...");
   const state = await getUserState(TEST);
   const result = nextState(state, text);
 
