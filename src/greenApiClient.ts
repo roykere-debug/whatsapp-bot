@@ -6,16 +6,23 @@ let clientInstance: AxiosInstance | null = null;
 
 function getClient(): AxiosInstance {
   if (!clientInstance) {
+    console.log("[GREEN_API] Initializing Green API client...");
     const idInstance = process.env.GREEN_API_INSTANCE_ID;
     const apiTokenInstance = process.env.GREEN_API_TOKEN;
 
     if (!idInstance || !apiTokenInstance) {
+      console.error("[GREEN_API] ❌ Missing credentials");
       throw new Error('Missing GREEN_API_INSTANCE_ID or GREEN_API_TOKEN');
     }
 
     const baseUrl = 'https://api.green-api.com';
+    const apiUrl = `${baseUrl}/waInstance${idInstance}`;
+    console.log("[GREEN_API] Base URL:", apiUrl);
+    console.log("[GREEN_API] Instance ID:", idInstance);
+    console.log("[GREEN_API] Token:", apiTokenInstance ? "✅ Set" : "❌ Missing");
+    
     clientInstance = axios.create({
-      baseURL: `${baseUrl}/waInstance${idInstance}`,
+      baseURL: apiUrl,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -26,8 +33,11 @@ function getClient(): AxiosInstance {
       if (request.url) {
         request.url += `?token=${apiTokenInstance}`;
       }
+      console.log("[GREEN_API] Making request to:", request.url);
       return request;
     });
+    
+    console.log("[GREEN_API] ✅ Client initialized");
   }
   return clientInstance;
 }
@@ -39,15 +49,23 @@ export async function sendMessage(
   chatId: string,
   message: string
 ): Promise<SendMessageResponse> {
+  console.log("[GREEN_API] sendMessage called");
+  console.log("[GREEN_API] chatId:", chatId);
+  console.log("[GREEN_API] message length:", message.length);
   try {
     const client = getClient();
+    console.log("[GREEN_API] Sending POST to /sendMessage");
     const response = await client.post<SendMessageResponse>('/sendMessage', {
       chatId,
       message,
     });
+    console.log("[GREEN_API] ✅ Message sent successfully:", response.data);
     return response.data;
   } catch (error) {
+    console.error("[GREEN_API] ❌ Error sending message:", error);
     if (axios.isAxiosError(error)) {
+      console.error("[GREEN_API] Response status:", error.response?.status);
+      console.error("[GREEN_API] Response data:", error.response?.data);
       throw new Error(
         `Failed to send message: ${error.response?.data?.message || error.message}`
       );

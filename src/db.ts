@@ -8,7 +8,13 @@ const pool = new Pool({
 
 // Initialize schema on module load
 (async () => {
+  console.log("[DB] Initializing database connection...");
   try {
+    console.log("[DB] Testing database connection...");
+    await pool.query('SELECT NOW()');
+    console.log("[DB] ✅ Database connection successful");
+    
+    console.log("[DB] Creating tables if they don't exist...");
     await pool.query(`
       CREATE TABLE IF NOT EXISTS user_states (
         phone TEXT PRIMARY KEY,
@@ -33,8 +39,14 @@ const pool = new Pool({
       CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads(phone);
       CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);
     `);
+    console.log("[DB] ✅ Database schema initialized successfully");
   } catch (error) {
-    console.error('Error initializing database schema:', error);
+    console.error('[DB] ❌ Error initializing database schema:', error);
+    if (error instanceof Error) {
+      console.error('[DB] Error message:', error.message);
+      console.error('[DB] Error stack:', error.stack);
+    }
+    // Don't exit - let the server start and show the error
   }
 })();
 
