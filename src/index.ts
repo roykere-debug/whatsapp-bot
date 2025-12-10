@@ -19,13 +19,13 @@ app.get("/", (_req, res) => {
 
 app.post("/webhook/greenapi", webhook);
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log("✅ Server running on port", PORT);
   console.log("📡 Webhook endpoint: http://localhost:" + PORT + "/webhook/greenapi");
   console.log("🔒 Safe Mode - TEST_USER_PHONE:", process.env.TEST_USER_PHONE || "NOT SET");
 });
 
 // Add error handling
-app.on('error', (error: Error) => {
+server.on('error', (error: Error) => {
   console.error("❌ Server error:", error);
 });
