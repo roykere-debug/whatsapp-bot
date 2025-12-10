@@ -8,10 +8,16 @@ const yes = (t: string, arr: string[]) =>
 export function nextState(
   current: UserState,
   incoming: string
-): { next: UserState; response: string | null; complete: boolean } {
+): { 
+  next: UserState; 
+  response: string | null; 
+  buttons?: Array<{ buttonId: string; buttonText: string }>;
+  complete: boolean;
+} {
   const text = clean(incoming);
   let next = { ...current, data: { ...current.data } };
   let response: string | null = null;
+  let buttons: Array<{ buttonId: string; buttonText: string }> | undefined = undefined;
   let complete = false;
 
   const set = (s: UserStateName) => {
@@ -23,43 +29,71 @@ export function nextState(
   if (current.state === "idle") {
     set("waiting_order_type");
     response = "הזמנה קיימת או הזמנה חדשה?";
-    return { next, response, complete };
+    buttons = [
+      { buttonId: "new_order", buttonText: "הזמנה חדשה" },
+      { buttonId: "existing_order", buttonText: "הזמנה קיימת" }
+    ];
+    return { next, response, buttons, complete };
   }
 
   // --- waiting_order_type ---
   if (current.state === "waiting_order_type") {
-    if (yes(text, ["הזמנה חדשה", "חדשה", "הזמנה חדש"])) {
+    // Handle button clicks or text input
+    const isNewOrder = yes(text, ["הזמנה חדשה", "חדשה", "הזמנה חדש", "new_order"]);
+    const isExistingOrder = yes(text, ["הזמנה קיימת", "קיימת", "הזמנה קיים", "existing_order"]);
+    
+    if (isNewOrder || text === "new_order") {
       next.data.orderType = "new";
       set("waiting_package_or_tickets");
       response = "חבילה או כרטיסים?";
-      return { next, response, complete };
+      buttons = [
+        { buttonId: "tickets", buttonText: "כרטיסים" },
+        { buttonId: "package", buttonText: "חבילה" }
+      ];
+      return { next, response, buttons, complete };
     }
-    if (yes(text, ["הזמנה קיימת", "קיימת", "הזמנה קיים"])) {
+    if (isExistingOrder || text === "existing_order") {
       next.data.orderType = "existing";
       set("waiting_urgency_general");
       response = "דחוף או לא דחוף?";
-      return { next, response, complete };
+      buttons = [
+        { buttonId: "urgent", buttonText: "דחוף" },
+        { buttonId: "not_urgent", buttonText: "לא דחוף" }
+      ];
+      return { next, response, buttons, complete };
     }
-    response = "תכתוב 'הזמנה קיימת' או 'הזמנה חדשה'";
-    return { next, response, complete };
+    response = "תכתוב 'הזמנה קיימת' או 'הזמנה חדשה', או לחץ על אחד הכפתורים";
+    buttons = [
+      { buttonId: "new_order", buttonText: "הזמנה חדשה" },
+      { buttonId: "existing_order", buttonText: "הזמנה קיימת" }
+    ];
+    return { next, response, buttons, complete };
   }
 
   // --- waiting_package_or_tickets ---
   if (current.state === "waiting_package_or_tickets") {
-    if (yes(text, ["כרטיסים", "כרטיס"])) {
+    // Handle button clicks or text input
+    const isTickets = yes(text, ["כרטיסים", "כרטיס"]) || text === "tickets";
+    const isPackage = yes(text, ["חבילה", "חבילות"]) || text === "package";
+    
+    if (isTickets) {
       next.data.requestType = "tickets";
       set("waiting_tickets_game");
       response = "עבור איזה משחק וכמה כרטיסים?";
       return { next, response, complete };
     }
-    if (yes(text, ["חבילה", "חבילות"])) {
+    if (isPackage) {
       next.data.requestType = "package";
       set("waiting_package_details");
       response = "אני צריך את הפרטים הבאים:\n• שם המשחק/משחקים\n• מספר אנשים\n• מספר טלפון\n• דגשים והעדפות\n\nתתחיל עם שם המשחק/משחקים:";
       return { next, response, complete };
     }
-    response = "תכתוב 'חבילה' או 'כרטיסים'";
-    return { next, response, complete };
+    response = "תכתוב 'חבילה' או 'כרטיסים', או לחץ על אחד הכפתורים";
+    buttons = [
+      { buttonId: "tickets", buttonText: "כרטיסים" },
+      { buttonId: "package", buttonText: "חבילה" }
+    ];
+    return { next, response, buttons, complete };
   }
 
   // --- waiting_tickets_game ---
@@ -156,21 +190,29 @@ export function nextState(
 
   // --- waiting_urgency_general ---
   if (current.state === "waiting_urgency_general") {
-    if (yes(text, ["דחוף", "דחוף מאוד", "חירום"])) {
+    // Handle button clicks or text input
+    const isUrgent = yes(text, ["דחוף", "דחוף מאוד", "חירום"]) || text === "urgent";
+    const isNotUrgent = yes(text, ["לא דחוף", "יכול לחכות", "לא", "רגיל"]) || text === "not_urgent";
+    
+    if (isUrgent) {
       next.data.isUrgent = true;
       set("done");
       complete = true;
       response = "מספר טלפון חירום: 0535515522";
       return { next, response, complete };
     }
-    if (yes(text, ["לא דחוף", "יכול לחכות", "לא", "רגיל"])) {
+    if (isNotUrgent) {
       next.data.isUrgent = false;
       set("waiting_general_request");
       response = "תשאיר כאן את הבקשה ופרטים, נחזור אליך בהקדם";
       return { next, response, complete };
     }
-    response = "תכתוב 'דחוף' או 'לא דחוף'";
-    return { next, response, complete };
+    response = "תכתוב 'דחוף' או 'לא דחוף', או לחץ על אחד הכפתורים";
+    buttons = [
+      { buttonId: "urgent", buttonText: "דחוף" },
+      { buttonId: "not_urgent", buttonText: "לא דחוף" }
+    ];
+    return { next, response, buttons, complete };
   }
 
   // --- waiting_general_request ---

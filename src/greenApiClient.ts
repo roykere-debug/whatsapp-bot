@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import type { GreenApiConfig, Message, SendMessageResponse } from './types';
+import type { GreenApiConfig, Message, SendMessageResponse, SendButtonsRequest } from './types';
 
 // Singleton client instance
 let clientInstance: AxiosInstance | null = null;
@@ -88,6 +88,63 @@ export async function sendMessage(
       throw new Error(
         `Failed to send message: ${error.response?.data?.message || error.message}`
       );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Send a message with interactive buttons
+ */
+export async function sendButtons(
+  chatId: string,
+  message: string,
+  buttons: Array<{ buttonId: string; buttonText: string }>,
+  footer?: string
+): Promise<SendMessageResponse> {
+  console.log("[GREEN_API] sendButtons called");
+  console.log("[GREEN_API] chatId:", chatId);
+  console.log("[GREEN_API] message:", message);
+  console.log("[GREEN_API] buttons count:", buttons.length);
+  try {
+    const idInstance = process.env.GREEN_API_INSTANCE_ID;
+    const apiTokenInstance = process.env.GREEN_API_TOKEN;
+    
+    if (!idInstance || !apiTokenInstance) {
+      throw new Error('Missing GREEN_API_INSTANCE_ID or GREEN_API_TOKEN');
+    }
+
+    // Use the standard Green API format: /SendButtons/{token}
+    const baseUrl = 'https://api.green-api.com';
+    const url = `${baseUrl}/waInstance${idInstance}/SendButtons/${apiTokenInstance}`;
+    
+    const requestBody: SendButtonsRequest = {
+      chatId,
+      message,
+      buttons,
+    };
+    
+    if (footer) {
+      requestBody.footer = footer;
+    }
+    
+    console.log("[GREEN_API] Sending POST to:", url);
+    console.log("[GREEN_API] Request body:", JSON.stringify(requestBody, null, 2));
+    const response = await axios.post<SendMessageResponse>(url, requestBody, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    console.log("[GREEN_API] ✅ Buttons sent successfully:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("[GREEN_API] ❌ Error sending buttons:", error);
+    if (axios.isAxiosError(error)) {
+      console.error("[GREEN_API] Response status:", error.response?.status);
+      console.error("[GREEN_API] Response data:", error.response?.data);
+      // Fallback to regular message if buttons fail
+      console.log("[GREEN_API] Falling back to regular message...");
+      return sendMessage(chatId, `${message}\n\n${buttons.map((b, i) => `${i + 1}. ${b.buttonText}`).join('\n')}`);
     }
     throw error;
   }

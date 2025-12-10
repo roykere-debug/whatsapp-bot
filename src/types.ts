@@ -49,6 +49,18 @@ export interface SendMessageResponse {
   idMessage: string;
 }
 
+export interface Button {
+  buttonId: string;
+  buttonText: string;
+}
+
+export interface SendButtonsRequest {
+  chatId: string;
+  message: string;
+  footer?: string;
+  buttons: Button[];
+}
+
 // Legacy types for backwards compatibility
 export interface ConversationState {
   chatId: string;
@@ -101,6 +113,7 @@ export interface GreenWebhookBody {
   messageData?: {
     textMessageData?: { textMessage?: string };
     extendedTextMessageData?: { text?: string };
+    buttonTextData?: { buttonText?: string };
   };
 }
 

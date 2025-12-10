@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { GreenWebhookBody } from "./types";
 import { getUserState, upsertUserState, insertLead } from "./db";
 import { nextState } from "./nextState";
-import { sendMessage } from "./greenApiClient";
+import { sendMessage, sendButtons } from "./greenApiClient";
 
 // Helper function to extract phone number (only digits)
 function extractPhone(str: string): string {
@@ -19,6 +19,10 @@ console.log("[CONFIG] TEST_USER_PHONE (raw):", TEST_RAW);
 console.log("[CONFIG] TEST_USER_PHONE (cleaned):", TEST);
 
 function getText(b: GreenWebhookBody): string {
+  // Handle button clicks - buttonTextData contains the buttonId
+  if (b.messageData?.buttonTextData?.buttonText) {
+    return b.messageData.buttonTextData.buttonText;
+  }
   return (
     b.messageData?.textMessageData?.textMessage ||
     b.messageData?.extendedTextMessageData?.text ||
@@ -138,8 +142,13 @@ export async function webhook(req: Request, res: Response) {
         await upsertUserState(result.next);
         if (result.response) {
           try {
-            await sendMessage(chatId, result.response);
-            console.log("[WEBHOOK] Greeting sent");
+            if (result.buttons && result.buttons.length > 0) {
+              await sendButtons(chatId, result.response, result.buttons);
+              console.log("[WEBHOOK] Greeting with buttons sent");
+            } else {
+              await sendMessage(chatId, result.response);
+              console.log("[WEBHOOK] Greeting sent");
+            }
           } catch (sendError) {
             console.error("[WEBHOOK] Error sending greeting:", sendError);
           }
@@ -212,8 +221,14 @@ export async function webhook(req: Request, res: Response) {
         try {
           console.log("[WEBHOOK] Sending message to:", chatId);
           console.log("[WEBHOOK] Message content:", result.response);
-          const sendResult = await sendMessage(chatId, result.response);
-          console.log("[WEBHOOK] Message sent successfully:", sendResult);
+          if (result.buttons && result.buttons.length > 0) {
+            console.log("[WEBHOOK] Sending with buttons:", result.buttons);
+            const sendResult = await sendButtons(chatId, result.response, result.buttons);
+            console.log("[WEBHOOK] Message with buttons sent successfully:", sendResult);
+          } else {
+            const sendResult = await sendMessage(chatId, result.response);
+            console.log("[WEBHOOK] Message sent successfully:", sendResult);
+          }
         } catch (sendError) {
           console.error("[WEBHOOK] Error sending message:", sendError);
           if (sendError instanceof Error) {
