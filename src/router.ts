@@ -163,17 +163,45 @@ export async function webhook(req: Request, res: Response) {
       await upsertUserState(result.next);
       console.log("[WEBHOOK] State saved successfully");
 
-      if (result.complete && result.next.data.game && result.next.data.amount) {
+      // Insert lead when complete - support all request types
+      if (result.complete) {
         try {
-          await insertLead({
-            phone: result.next.data.phoneNumber!,
-            game: result.next.data.game!,
-            amount: result.next.data.amount!,
-            isUrgent: !!result.next.data.isUrgent,
-            isNewCustomer: !!result.next.data.isNewCustomer,
-            raw: body
-          });
-          console.log("[WEBHOOK] Lead inserted successfully");
+          // For tickets requests
+          if (result.next.data.requestType === "tickets" && result.next.data.ticketsGame && result.next.data.ticketsAmount) {
+            await insertLead({
+              phone: userPhone,
+              game: result.next.data.ticketsGame,
+              amount: result.next.data.ticketsAmount,
+              isUrgent: false, // Tickets requests go through website
+              isNewCustomer: result.next.data.orderType === "new",
+              raw: { ...result.next.data, type: "tickets", body }
+            });
+            console.log("[WEBHOOK] Tickets lead inserted successfully");
+          }
+          // For package requests
+          else if (result.next.data.requestType === "package" && result.next.data.packageGames && result.next.data.phoneNumber) {
+            await insertLead({
+              phone: result.next.data.phoneNumber,
+              game: result.next.data.packageGames,
+              amount: parseInt(result.next.data.packagePeople || "1") || 1,
+              isUrgent: false,
+              isNewCustomer: result.next.data.orderType === "new",
+              raw: { ...result.next.data, type: "package", body }
+            });
+            console.log("[WEBHOOK] Package lead inserted successfully");
+          }
+          // For general requests (existing orders or urgent)
+          else if (result.next.data.generalRequest || (result.next.data.isUrgent && result.next.data.orderType === "existing")) {
+            await insertLead({
+              phone: userPhone,
+              game: result.next.data.generalRequest || "בקשה כללית",
+              amount: 0,
+              isUrgent: !!result.next.data.isUrgent,
+              isNewCustomer: false,
+              raw: { ...result.next.data, type: "general", body }
+            });
+            console.log("[WEBHOOK] General request lead inserted successfully");
+          }
         } catch (leadError) {
           console.error("[WEBHOOK] Error inserting lead:", leadError);
           // Continue even if lead insertion fails

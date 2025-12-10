@@ -43,14 +43,39 @@ export class BotStateMachine {
     // If complete, insert lead into database
     if (complete && next.state === 'done') {
       try {
-        await insertLead({
-          phone: next.phone,
-          game: next.data.game || '',
-          amount: next.data.amount || 0,
-          isUrgent: next.data.isUrgent || false,
-          isNewCustomer: next.data.isNewCustomer || false,
-          raw: next.data,
-        });
+        // For tickets requests
+        if (next.data.requestType === "tickets" && next.data.ticketsGame && next.data.ticketsAmount) {
+          await insertLead({
+            phone: next.phone,
+            game: next.data.ticketsGame,
+            amount: next.data.ticketsAmount,
+            isUrgent: false,
+            isNewCustomer: next.data.orderType === "new",
+            raw: { ...next.data, type: "tickets" },
+          });
+        }
+        // For package requests
+        else if (next.data.requestType === "package" && next.data.packageGames && next.data.phoneNumber) {
+          await insertLead({
+            phone: next.data.phoneNumber,
+            game: next.data.packageGames,
+            amount: parseInt(next.data.packagePeople || "1") || 1,
+            isUrgent: false,
+            isNewCustomer: next.data.orderType === "new",
+            raw: { ...next.data, type: "package" },
+          });
+        }
+        // For general requests
+        else if (next.data.generalRequest || (next.data.isUrgent && next.data.orderType === "existing")) {
+          await insertLead({
+            phone: next.phone,
+            game: next.data.generalRequest || "בקשה כללית",
+            amount: 0,
+            isUrgent: !!next.data.isUrgent,
+            isNewCustomer: false,
+            raw: { ...next.data, type: "general" },
+          });
+        }
       } catch (error) {
         console.error('Error inserting lead:', error);
       }

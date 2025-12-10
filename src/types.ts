@@ -64,15 +64,26 @@ export interface UserStateData {
   game?: string;
   amount?: number;
   phoneNumber?: string;
+  // New flow data
+  orderType?: "existing" | "new"; // הזמנה קיימת או הזמנה חדשה
+  requestType?: "package" | "tickets" | "general"; // חבילה, כרטיסים, או בקשה כללית
+  ticketsGame?: string; // עבור איזה משחק (כרטיסים)
+  ticketsAmount?: number; // כמה כרטיסים
+  packageGames?: string; // שם המשחק/משחקים (חבילה)
+  packagePeople?: string; // אנשים (חבילה)
+  packageNotes?: string; // דגשים והעדפות (חבילה)
+  generalRequest?: string; // פרטי הבקשה הכללית
 }
 
 export type UserStateName =
   | "idle"
-  | "waiting_client_type"
-  | "waiting_urgency"
-  | "waiting_game"
-  | "waiting_amount"
-  | "waiting_phone"
+  | "waiting_order_type" // הזמנה קיימת או הזמנה חדשה
+  | "waiting_package_or_tickets" // חבילה או כרטיסים
+  | "waiting_tickets_game" // עבור איזה משחק (כרטיסים)
+  | "waiting_tickets_amount" // כמה כרטיסים
+  | "waiting_package_details" // פרטי חבילה (משחק, אנשים, טלפון, הערות)
+  | "waiting_urgency_general" // דחוף או לא דחוף (בקשה כללית)
+  | "waiting_general_request" // פרטי הבקשה (לא דחוף)
   | "done";
 
 export interface UserState {
