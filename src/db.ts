@@ -39,42 +39,52 @@ const pool = new Pool({
 })();
 
 export async function getUserState(phone: string): Promise<UserState> {
-  const result = await pool.query(
-    `SELECT phone, state, data, updated_at
-     FROM user_states
-     WHERE phone = $1`,
-    [phone]
-  );
+  try {
+    const result = await pool.query(
+      `SELECT phone, state, data, updated_at
+       FROM user_states
+       WHERE phone = $1`,
+      [phone]
+    );
 
-  if (result.rows.length === 0) {
+    if (result.rows.length === 0) {
+      return {
+        phone,
+        state: "idle",
+        data: {},
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    const row = result.rows[0];
+
     return {
-      phone,
-      state: "idle",
-      data: {},
-      updatedAt: new Date().toISOString()
+      phone: row.phone,
+      state: row.state,
+      data: row.data,
+      updatedAt: row.updated_at
     };
+  } catch (error) {
+    console.error("[DB] Error getting user state:", error);
+    throw new Error(`Failed to get user state: ${error instanceof Error ? error.message : String(error)}`);
   }
-
-  const row = result.rows[0];
-
-  return {
-    phone: row.phone,
-    state: row.state,
-    data: row.data,
-    updatedAt: row.updated_at
-  };
 }
 
 export async function upsertUserState(state: UserState): Promise<void> {
-  await pool.query(
-    `INSERT INTO user_states (phone, state, data, updated_at)
-     VALUES ($1, $2, $3, NOW())
-     ON CONFLICT (phone)
-     DO UPDATE SET state = EXCLUDED.state,
-                   data = EXCLUDED.data,
-                   updated_at = NOW()`,
-    [state.phone, state.state, state.data]
-  );
+  try {
+    await pool.query(
+      `INSERT INTO user_states (phone, state, data, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (phone)
+       DO UPDATE SET state = EXCLUDED.state,
+                     data = EXCLUDED.data,
+                     updated_at = NOW()`,
+      [state.phone, state.state, state.data]
+    );
+  } catch (error) {
+    console.error("[DB] Error upserting user state:", error);
+    throw new Error(`Failed to upsert user state: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 export async function insertLead(l: {
@@ -85,16 +95,21 @@ export async function insertLead(l: {
   isNewCustomer: boolean;
   raw: any;
 }): Promise<void> {
-  await pool.query(
-    `INSERT INTO leads (phone, game, amount, is_urgent, is_new_customer, raw)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [
-      l.phone,
-      l.game,
-      l.amount,
-      l.isUrgent,
-      l.isNewCustomer,
-      l.raw
-    ]
-  );
+  try {
+    await pool.query(
+      `INSERT INTO leads (phone, game, amount, is_urgent, is_new_customer, raw)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        l.phone,
+        l.game,
+        l.amount,
+        l.isUrgent,
+        l.isNewCustomer,
+        l.raw
+      ]
+    );
+  } catch (error) {
+    console.error("[DB] Error inserting lead:", error);
+    throw new Error(`Failed to insert lead: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
