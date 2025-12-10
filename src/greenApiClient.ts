@@ -15,14 +15,11 @@ function getClient(): AxiosInstance {
       throw new Error('Missing GREEN_API_INSTANCE_ID or GREEN_API_TOKEN');
     }
 
-    // Extract subdomain from instance ID (first 4 digits)
-    // For instance 7105410199, subdomain is 7105
-    const subdomain = idInstance.toString().substring(0, 4);
-    const baseUrl = `https://${subdomain}.api.green-api.com`;
+    // Use the standard Green API base URL (no subdomain needed)
+    const baseUrl = 'https://api.green-api.com';
     const apiUrl = `${baseUrl}/waInstance${idInstance}`;
     
     console.log("[GREEN_API] Base URL:", apiUrl);
-    console.log("[GREEN_API] Subdomain:", subdomain);
     console.log("[GREEN_API] Instance ID:", idInstance);
     console.log("[GREEN_API] Token:", apiTokenInstance ? "✅ Set" : "❌ Missing");
     
@@ -33,11 +30,11 @@ function getClient(): AxiosInstance {
       },
     });
 
-    // Add token to requests
+    // Add token to requests as query parameter
     clientInstance.interceptors.request.use((request) => {
       if (request.url) {
         // Check if token is already in URL
-        if (!request.url.includes('token=')) {
+        if (!request.url.includes('token=') && !request.url.includes(`/${apiTokenInstance}`)) {
           request.url += (request.url.includes('?') ? '&' : '?') + `token=${apiTokenInstance}`;
         }
       }
@@ -61,11 +58,25 @@ export async function sendMessage(
   console.log("[GREEN_API] chatId:", chatId);
   console.log("[GREEN_API] message length:", message.length);
   try {
-    const client = getClient();
-    console.log("[GREEN_API] Sending POST to /sendMessage");
-    const response = await client.post<SendMessageResponse>('/sendMessage', {
+    const idInstance = process.env.GREEN_API_INSTANCE_ID;
+    const apiTokenInstance = process.env.GREEN_API_TOKEN;
+    
+    if (!idInstance || !apiTokenInstance) {
+      throw new Error('Missing GREEN_API_INSTANCE_ID or GREEN_API_TOKEN');
+    }
+
+    // Use the standard Green API format: /sendMessage/{token}
+    const baseUrl = 'https://api.green-api.com';
+    const url = `${baseUrl}/waInstance${idInstance}/sendMessage/${apiTokenInstance}`;
+    
+    console.log("[GREEN_API] Sending POST to:", url);
+    const response = await axios.post<SendMessageResponse>(url, {
       chatId,
       message,
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
     console.log("[GREEN_API] ✅ Message sent successfully:", response.data);
     return response.data;
@@ -90,22 +101,21 @@ export class GreenApiClient {
   private readonly baseUrl = 'https://api.green-api.com';
 
   constructor(private config: GreenApiConfig) {
-    // Extract subdomain from instance ID (first 4 digits)
-    const subdomain = config.idInstance.toString().substring(0, 4);
-    const instanceBaseUrl = `https://${subdomain}.api.green-api.com`;
+    // Use the standard Green API base URL (no subdomain needed)
+    const baseUrl = 'https://api.green-api.com';
     
     this.client = axios.create({
-      baseURL: `${instanceBaseUrl}/waInstance${config.idInstance}`,
+      baseURL: `${baseUrl}/waInstance${config.idInstance}`,
       headers: {
         'Content-Type': 'application/json',
       },
     });
 
-    // Add token to requests
+    // Add token to requests as query parameter
     this.client.interceptors.request.use((request) => {
       if (request.url) {
         // Check if token is already in URL
-        if (!request.url.includes('token=')) {
+        if (!request.url.includes('token=') && !request.url.includes(`/${config.apiTokenInstance}`)) {
           request.url += (request.url.includes('?') ? '&' : '?') + `token=${config.apiTokenInstance}`;
         }
       }
@@ -121,8 +131,10 @@ export class GreenApiClient {
     message: string
   ): Promise<SendMessageResponse> {
     try {
+      // Use the standard Green API format: /sendMessage/{token}
+      const url = `/sendMessage/${this.config.apiTokenInstance}`;
       const response = await this.client.post<SendMessageResponse>(
-        '/sendMessage',
+        url,
         {
           chatId,
           message,
