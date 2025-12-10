@@ -15,9 +15,14 @@ function getClient(): AxiosInstance {
       throw new Error('Missing GREEN_API_INSTANCE_ID or GREEN_API_TOKEN');
     }
 
-    const baseUrl = 'https://api.green-api.com';
+    // Extract subdomain from instance ID (first 4 digits)
+    // For instance 7105410199, subdomain is 7105
+    const subdomain = idInstance.toString().substring(0, 4);
+    const baseUrl = `https://${subdomain}.api.green-api.com`;
     const apiUrl = `${baseUrl}/waInstance${idInstance}`;
+    
     console.log("[GREEN_API] Base URL:", apiUrl);
+    console.log("[GREEN_API] Subdomain:", subdomain);
     console.log("[GREEN_API] Instance ID:", idInstance);
     console.log("[GREEN_API] Token:", apiTokenInstance ? "✅ Set" : "❌ Missing");
     
@@ -31,7 +36,10 @@ function getClient(): AxiosInstance {
     // Add token to requests
     clientInstance.interceptors.request.use((request) => {
       if (request.url) {
-        request.url += `?token=${apiTokenInstance}`;
+        // Check if token is already in URL
+        if (!request.url.includes('token=')) {
+          request.url += (request.url.includes('?') ? '&' : '?') + `token=${apiTokenInstance}`;
+        }
       }
       console.log("[GREEN_API] Making request to:", request.url);
       return request;
@@ -82,8 +90,12 @@ export class GreenApiClient {
   private readonly baseUrl = 'https://api.green-api.com';
 
   constructor(private config: GreenApiConfig) {
+    // Extract subdomain from instance ID (first 4 digits)
+    const subdomain = config.idInstance.toString().substring(0, 4);
+    const instanceBaseUrl = `https://${subdomain}.api.green-api.com`;
+    
     this.client = axios.create({
-      baseURL: `${this.baseUrl}/waInstance${config.idInstance}`,
+      baseURL: `${instanceBaseUrl}/waInstance${config.idInstance}`,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -92,7 +104,10 @@ export class GreenApiClient {
     // Add token to requests
     this.client.interceptors.request.use((request) => {
       if (request.url) {
-        request.url += `?token=${config.apiTokenInstance}`;
+        // Check if token is already in URL
+        if (!request.url.includes('token=')) {
+          request.url += (request.url.includes('?') ? '&' : '?') + `token=${config.apiTokenInstance}`;
+        }
       }
       return request;
     });
