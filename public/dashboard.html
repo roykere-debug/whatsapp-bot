@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>לוח בקרה - WhatsApp Bot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            position: relative;
+        }
+
+        .close-button {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: #f5f5f5;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: #666;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .close-button:hover {
+            background: #e0e0e0;
+            color: #333;
+            transform: scale(1.1);
+        }
+
+        .close-button:active {
+            transform: scale(0.95);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 14px;
+        }
+
+        .status-container {
+            margin: 40px 0;
+        }
+
+        .status-label {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .toggle-container {
+            position: relative;
+            display: inline-block;
+            width: 80px;
+            height: 40px;
+        }
+
+        .toggle-input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 40px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 32px;
+            width: 32px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle-input:checked + .toggle-slider {
+            background-color: #4CAF50;
+        }
+
+        .toggle-input:checked + .toggle-slider:before {
+            transform: translateX(40px);
+        }
+
+        .toggle-input:disabled + .toggle-slider {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status-text {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .status-text.enabled {
+            color: #4CAF50;
+        }
+
+        .status-text.disabled {
+            color: #f44336;
+        }
+
+        .loading {
+            display: none;
+            margin-top: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .error {
+            display: none;
+            margin-top: 20px;
+            padding: 12px;
+            background-color: #ffebee;
+            color: #c62828;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .error.active {
+            display: block;
+        }
+
+        .success {
+            display: none;
+            margin-top: 20px;
+            padding: 12px;
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .success.active {
+            display: block;
+        }
+
+        .info {
+            margin-top: 30px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .back-button {
+            margin-top: 30px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .back-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .back-button:active {
+            transform: translateY(0);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .loading.active {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="close-button" id="closeButton" title="סגור" onclick="closeDashboard()">×</button>
+        <h1>🤖 לוח בקרת הבוט</h1>
+        <p class="subtitle">WhatsApp Tickets Bot</p>
+
+        <div class="status-container">
+            <div class="status-label">סטטוס הבוט:</div>
+            <label class="toggle-container">
+                <input type="checkbox" class="toggle-input" id="botToggle">
+                <span class="toggle-slider"></span>
+            </label>
+            <div class="status-text" id="statusText">טוען...</div>
+        </div>
+
+        <div class="loading" id="loading">מעדכן...</div>
+        <div class="error" id="error"></div>
+        <div class="success" id="success"></div>
+
+        <div class="info">
+            <strong>מידע:</strong><br>
+            כאשר הבוט כבוי, הוא לא יעבד הודעות נכנסות.<br>
+            הודעות יגיעו אך לא יעובדו עד שתפעיל את הבוט מחדש.
+        </div>
+
+        <button class="back-button" onclick="closeDashboard()">← חזרה</button>
+    </div>
+
+    <script>
+        const toggle = document.getElementById('botToggle');
+        const statusText = document.getElementById('statusText');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const success = document.getElementById('success');
+
+        // Load current status
+        async function loadStatus() {
+            try {
+                const response = await fetch('/api/bot/status');
+                if (!response.ok) throw new Error('Failed to load status');
+                const data = await response.json();
+                toggle.checked = data.enabled;
+                updateStatusText(data.enabled);
+            } catch (err) {
+                console.error('Error loading status:', err);
+                error.textContent = 'שגיאה בטעינת הסטטוס. נסה לרענן את הדף.';
+                error.classList.add('active');
+            }
+        }
+
+        function updateStatusText(enabled) {
+            if (enabled) {
+                statusText.textContent = '✅ הבוט פעיל';
+                statusText.className = 'status-text enabled';
+            } else {
+                statusText.textContent = '⏸️ הבוט כבוי';
+                statusText.className = 'status-text disabled';
+            }
+        }
+
+        // Handle toggle
+        toggle.addEventListener('change', async function() {
+            const enabled = toggle.checked;
+            loading.classList.add('active');
+            error.classList.remove('active');
+            success.classList.remove('active');
+            toggle.disabled = true;
+
+            try {
+                const response = await fetch('/api/bot/toggle', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ enabled })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to update status');
+                }
+
+                const data = await response.json();
+                updateStatusText(data.enabled);
+                success.textContent = enabled ? 'הבוט הופעל בהצלחה!' : 'הבוט כובה בהצלחה!';
+                success.classList.add('active');
+                
+                // Hide success message after 3 seconds
+                setTimeout(() => {
+                    success.classList.remove('active');
+                }, 3000);
+            } catch (err) {
+                console.error('Error updating status:', err);
+                error.textContent = 'שגיאה בעדכון הסטטוס: ' + err.message;
+                error.classList.add('active');
+                // Revert toggle
+                toggle.checked = !enabled;
+                updateStatusText(!enabled);
+            } finally {
+                loading.classList.remove('active');
+                toggle.disabled = false;
+            }
+        });
+
+        // Load status on page load
+        loadStatus();
+
+        // Refresh status every 30 seconds
+        setInterval(loadStatus, 30000);
+
+        // Close dashboard function
+        function closeDashboard() {
+            // Try to go back in history, or close window if opened as popup
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                // If no history, try to close the window (works if opened via window.open)
+                window.close();
+                // If window.close() doesn't work, redirect to home
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 100);
+            }
+        }
+
+        // Also allow closing with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeDashboard();
+            }
+        });
+    </script>
+</body>
+</html>

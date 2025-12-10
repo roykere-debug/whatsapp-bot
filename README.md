@@ -11,6 +11,7 @@ This bot handles WhatsApp messages through Green API, manages user state with a 
 - 🔒 **Safe Mode**: During testing, only allows messages from TEST_USER_PHONE
 - 🎯 **Modular Design**: Clean separation of concerns (router, state machine, API client)
 - 🔒 **Type Safe**: Full TypeScript support with strict mode
+- 🎛️ **Control Dashboard**: Web-based dashboard to enable/disable the bot at any time
 
 ## 🚀 How to Deploy on Railway
 
@@ -111,6 +112,8 @@ Done! 🎉
 │   ├── db.ts              # PostgreSQL database operations
 │   ├── stateMachine.ts    # Bot state machine
 │   └── types.ts           # TypeScript type definitions
+├── public/
+│   └── dashboard.html     # Bot control dashboard
 ├── dist/                  # Compiled JavaScript (generated)
 ├── package.json
 ├── tsconfig.json
@@ -153,6 +156,39 @@ idle → greeting → collecting_info → processing → completed
 - `GET /` - Bot information
 - `GET /health` - Health check endpoint
 - `POST /webhook/greenapi` - Webhook endpoint for Green API notifications
+- `GET /dashboard` - Bot control dashboard (web interface)
+- `GET /api/bot/status` - Get bot enabled/disabled status
+- `POST /api/bot/toggle` - Toggle bot status (enable/disable)
+
+## Bot Control Dashboard
+
+The bot includes a web-based control dashboard that allows you to enable or disable the bot at any time.
+
+### Accessing the Dashboard
+
+Once your bot is running, visit:
+```
+http://localhost:3000/dashboard
+```
+
+Or in production:
+```
+https://YOUR-APP.up.railway.app/dashboard
+```
+
+### Features
+
+- **Real-time Status**: See if the bot is currently enabled or disabled
+- **Toggle Control**: Click the toggle switch to enable/disable the bot instantly
+- **Auto-refresh**: Status updates automatically every 30 seconds
+- **Visual Feedback**: Clear indicators show the current bot status
+
+### How It Works
+
+- When the bot is **enabled**: All incoming messages are processed normally
+- When the bot is **disabled**: Incoming messages are received but not processed (webhook returns success but bot ignores the message)
+
+The bot status is stored in the database, so it persists across server restarts.
 
 ## Customization
 

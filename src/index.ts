@@ -32,7 +32,9 @@ app.use((req, res, next) => {
 app.use(express.json());
 
 // Serve static files from public directory (for dashboard)
-app.use(express.static(path.join(__dirname, '../public')));
+// Use process.cwd() to get project root, works in both dev and production
+const publicPath = path.join(process.cwd(), 'public');
+app.use(express.static(publicPath));
 
 // API endpoints for bot control
 app.get("/api/bot/status", async (_req, res) => {
@@ -67,7 +69,8 @@ app.post("/api/bot/toggle", async (req, res) => {
 
 // Dashboard route
 app.get("/dashboard", (_req, res) => {
-  res.sendFile(path.join(__dirname, '../public/dashboard.html'));
+  const dashboardPath = path.join(process.cwd(), 'public', 'dashboard.html');
+  res.sendFile(dashboardPath);
 });
 
 // Root endpoint moved below - see health check section
@@ -91,14 +94,15 @@ app.get("/health", (_req, res) => {
   }
 });
 
-// Root endpoint for Railway health checks
+// Root endpoint - serve dashboard
 app.get("/", (_req, res) => {
-  console.log("[ROOT] Root endpoint requested");
+  console.log("[ROOT] Root endpoint requested - serving dashboard");
   try {
-    res.status(200).send("WhatsApp Tickets Bot is running ✔️");
+    const dashboardPath = path.join(process.cwd(), 'public', 'dashboard.html');
+    res.sendFile(dashboardPath);
   } catch (error) {
-    console.error("[ROOT] Error in root endpoint:", error);
-    res.status(500).send("Error");
+    console.error("[ROOT] Error serving dashboard:", error);
+    res.status(500).send("Error loading dashboard");
   }
 });
 
@@ -219,7 +223,8 @@ try {
     console.log("📡 Webhook endpoint: http://localhost:" + PORT + "/webhook/greenapi");
     console.log("🔒 Safe Mode - TEST_USER_PHONE:", process.env.TEST_USER_PHONE || "NOT SET");
     console.log("📋 Health check: http://localhost:" + PORT + "/health");
-    console.log("📋 Root endpoint: http://localhost:" + PORT + "/");
+    console.log("🎛️ Dashboard: http://localhost:" + PORT + "/");
+    console.log("🎛️ Dashboard (alt): http://localhost:" + PORT + "/dashboard");
     console.log("=".repeat(50));
     console.log("[SERVER] Server is ready and listening for connections");
   });

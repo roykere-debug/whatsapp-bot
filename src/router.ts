@@ -58,75 +58,54 @@ export async function webhook(req: Request, res: Response) {
     console.log("[WEBHOOK] chatId:", chatId, "sender:", sender);
     console.log("[WEBHOOK] TEST (cleaned phone):", TEST);
 
-    // SAFE MODE — ONLY YOU
-    // If Safe Mode is disabled, allow all non-group messages
-    if (!SAFE_MODE_ENABLED) {
-      console.log("[WEBHOOK] Safe Mode disabled - allowing all messages");
-      // Continue processing (skip the isYou check)
-    } else {
-      // Extract phone numbers (keep only digits)
-      const chatIdPhone = extractPhone(chatId);
-      const senderPhone = extractPhone(sender);
-      const testPhone = extractPhone(TEST);
-      
-      console.log("[WEBHOOK] ===== SAFE MODE CHECK =====");
-      console.log("[WEBHOOK] Extracted phones:", {
-        chatId,
-        chatIdPhone,
-        sender,
-        senderPhone,
-        TEST,
-        testPhone,
-        "chatIdPhone === testPhone": chatIdPhone === testPhone,
-        "senderPhone === testPhone": senderPhone === testPhone
-      });
-      
-      // Check if it's a group chat (group chats have "-" in chatId)
-      const isGroupChat = chatId.includes("-");
-      console.log("[WEBHOOK] isGroupChat:", isGroupChat);
-      
-      // Check if phone numbers match (either chatId or sender should match)
-      const chatIdMatches = chatIdPhone === testPhone;
-      const senderMatches = senderPhone === testPhone;
-      const phoneMatches = chatIdMatches || senderMatches;
-      
-      // Allow if phone matches AND it's not a group chat
-      const isYou = phoneMatches && !isGroupChat;
-      
-      console.log("[WEBHOOK] Safe Mode check:", {
-        chatIdMatches,
-        senderMatches,
-        phoneMatches,
-        isGroupChat,
-        isYou,
-        "Will allow": isYou
-      });
-
-      if (!isYou) {
-        console.log("[SAFE] ❌ Message ignored:", { 
-          chatId, 
-          sender, 
-          reason: "Not authorized user or group chat",
-          details: {
-            chatIdPhone,
-            senderPhone,
-            testPhone,
-            phoneMatches,
-            isGroupChat
-          }
-        });
-        // Return early but don't crash - acknowledge the webhook
-        try {
-          return res.json({ ok: true, ignored: true });
-        } catch (err) {
-          console.error("[SAFE] Error sending response:", err);
-          // Don't throw - just log
-        }
-        return;
-      }
-      
-      console.log("[SAFE] ✅ Message allowed - user is authorized");
+    // STEP 1: ALWAYS IGNORE GROUP CHATS - Bot only works in private chats
+    // Group chats have "-" in chatId or end with "@g.us"
+    const isGroupChat = chatId.includes("-") || chatId.includes("@g.us");
+    if (isGroupChat) {
+      console.log("[WEBHOOK] ❌ Group chat detected - ignoring message");
+      console.log("[WEBHOOK] Group chatId:", chatId);
+      return res.json({ ok: true, ignored: true, reason: "group_chat" });
     }
+
+    // STEP 2: ALWAYS CHECK IF IT'S YOUR PHONE NUMBER (972549762201)
+    // Bot only responds to your number, regardless of Safe Mode setting
+    const chatIdPhone = extractPhone(chatId);
+    const senderPhone = extractPhone(sender);
+    const testPhone = extractPhone(TEST);
+    
+    console.log("[WEBHOOK] ===== PHONE NUMBER CHECK =====");
+    console.log("[WEBHOOK] Extracted phones:", {
+      chatId,
+      chatIdPhone,
+      sender,
+      senderPhone,
+      TEST,
+      testPhone,
+      "chatIdPhone === testPhone": chatIdPhone === testPhone,
+      "senderPhone === testPhone": senderPhone === testPhone
+    });
+    
+    // Check if phone numbers match (either chatId or sender should match)
+    const chatIdMatches = chatIdPhone === testPhone;
+    const senderMatches = senderPhone === testPhone;
+    const phoneMatches = chatIdMatches || senderMatches;
+    
+    if (!phoneMatches) {
+      console.log("[WEBHOOK] ❌ Message ignored - not your phone number:", { 
+        chatId, 
+        sender, 
+        reason: "Not authorized phone number",
+        details: {
+          chatIdPhone,
+          senderPhone,
+          testPhone,
+          phoneMatches
+        }
+      });
+      return res.json({ ok: true, ignored: true, reason: "not_authorized_phone" });
+    }
+    
+    console.log("[WEBHOOK] ✅ Message allowed - phone number authorized");
 
     const text = getText(body);
     console.log("[WEBHOOK] Text received:", text);
