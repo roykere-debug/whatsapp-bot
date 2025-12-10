@@ -45,6 +45,17 @@ const pool = new Pool({
 
         CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads(phone);
         CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);
+
+        CREATE TABLE IF NOT EXISTS bot_settings (
+          key TEXT PRIMARY KEY,
+          value JSONB NOT NULL,
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
+        -- Initialize bot status to enabled by default if not exists
+        INSERT INTO bot_settings (key, value, updated_at)
+        VALUES ('bot_enabled', 'true'::jsonb, NOW())
+        ON CONFLICT (key) DO NOTHING;
       `);
       console.log("[DB] ✅ Database schema initialized successfully");
     } catch (error) {
@@ -132,5 +143,54 @@ export async function insertLead(l: {
   } catch (error) {
     console.error("[DB] Error inserting lead:", error);
     throw new Error(`Failed to insert lead: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Get bot enabled status
+ */
+export async function getBotStatus(): Promise<boolean> {
+  try {
+    const result = await pool.query(
+      `SELECT value FROM bot_settings WHERE key = 'bot_enabled'`
+    );
+
+    if (result.rows.length === 0) {
+      // Default to enabled if not set
+      return true;
+    }
+
+    const value = result.rows[0].value;
+    // Handle both boolean and string values
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      return value === 'true' || value === '1';
+    }
+    return Boolean(value);
+  } catch (error) {
+    console.error("[DB] Error getting bot status:", error);
+    // Default to enabled on error
+    return true;
+  }
+}
+
+/**
+ * Set bot enabled status
+ */
+export async function setBotStatus(enabled: boolean): Promise<void> {
+  try {
+    await pool.query(
+      `INSERT INTO bot_settings (key, value, updated_at)
+       VALUES ('bot_enabled', $1::jsonb, NOW())
+       ON CONFLICT (key)
+       DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [enabled]
+    );
+    console.log(`[DB] Bot status set to: ${enabled ? 'enabled' : 'disabled'}`);
+  } catch (error) {
+    console.error("[DB] Error setting bot status:", error);
+    throw new Error(`Failed to set bot status: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

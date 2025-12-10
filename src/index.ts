@@ -7,6 +7,8 @@ console.log("[STARTUP] Current working directory:", process.cwd());
 import "dotenv/config";
 import express from "express";
 import { webhook } from "./router";
+import { getBotStatus, setBotStatus } from "./db";
+import path from "path";
 
 console.log("[STARTUP] Dependencies loaded");
 
@@ -28,6 +30,45 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+
+// Serve static files from public directory (for dashboard)
+app.use(express.static(path.join(__dirname, '../public')));
+
+// API endpoints for bot control
+app.get("/api/bot/status", async (_req, res) => {
+  try {
+    const enabled = await getBotStatus();
+    res.json({ enabled, status: enabled ? "enabled" : "disabled" });
+  } catch (error) {
+    console.error("[API] Error getting bot status:", error);
+    res.status(500).json({ 
+      error: "Failed to get bot status",
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+app.post("/api/bot/toggle", async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: "enabled must be a boolean" });
+    }
+    await setBotStatus(enabled);
+    res.json({ enabled, status: enabled ? "enabled" : "disabled" });
+  } catch (error) {
+    console.error("[API] Error setting bot status:", error);
+    res.status(500).json({ 
+      error: "Failed to set bot status",
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Dashboard route
+app.get("/dashboard", (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/dashboard.html'));
+});
 
 // Root endpoint moved below - see health check section
 

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { GreenWebhookBody } from "./types";
-import { getUserState, upsertUserState, insertLead } from "./db";
+import { getUserState, upsertUserState, insertLead, getBotStatus } from "./db";
 import { nextState } from "./nextState";
 import { sendMessage, sendButtons } from "./greenApiClient";
 
@@ -38,6 +38,13 @@ export async function webhook(req: Request, res: Response) {
   console.log("[WEBHOOK] Timestamp:", new Date().toISOString());
   
   try {
+    // Check if bot is enabled
+    const botEnabled = await getBotStatus();
+    if (!botEnabled) {
+      console.log("[WEBHOOK] ⏸️ Bot is disabled - ignoring message");
+      return res.json({ ok: true, ignored: true, reason: "bot_disabled" });
+    }
+
     console.log("[WEBHOOK] Received request");
     console.log("[WEBHOOK] Request method:", req.method);
     console.log("[WEBHOOK] Request path:", req.path);

@@ -190,11 +190,32 @@ export function nextState(
 
   // --- waiting_urgency_general ---
   if (current.state === "waiting_urgency_general") {
-    // Handle button clicks or text input
-    const isUrgent = yes(text, ["דחוף", "דחוף מאוד", "חירום"]) || text === "urgent";
-    const isNotUrgent = yes(text, ["לא דחוף", "יכול לחכות", "לא", "רגיל"]) || text === "not_urgent";
+    // Normalize text for comparison (remove extra spaces, trim)
+    const normalizedText = text.replace(/\s+/g, " ").trim();
     
-    if (isUrgent) {
+    // Handle button clicks - buttonText comes as the text, not buttonId
+    // Check for exact button text matches first
+    if (normalizedText === "דחוף" || normalizedText === "urgent" || text === "urgent") {
+      next.data.isUrgent = true;
+      set("done");
+      complete = true;
+      response = "מספר טלפון חירום: 0535515522";
+      return { next, response, complete };
+    }
+    
+    if (normalizedText === "לא דחוף" || normalizedText === "not_urgent" || text === "not_urgent") {
+      next.data.isUrgent = false;
+      set("waiting_general_request");
+      response = "תשאיר כאן את הבקשה ופרטים, נחזור אליך בהקדם";
+      return { next, response, complete };
+    }
+    
+    // Handle text input (partial matches)
+    const isUrgent = yes(text, ["דחוף", "דחוף מאוד", "חירום"]);
+    const isNotUrgent = yes(text, ["לא דחוף", "יכול לחכות", "רגיל", "לא"]) && 
+                        !yes(text, ["דחוף"]);
+    
+    if (isUrgent && !isNotUrgent) {
       next.data.isUrgent = true;
       set("done");
       complete = true;
